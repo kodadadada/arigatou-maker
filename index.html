@@ -252,7 +252,10 @@ body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; ma
         <h2>文字</h2>
         <div class="row"><label for="title">メイン</label><textarea id="title" rows="2" maxlength="40"></textarea><span></span></div>
         <div class="row"><label for="name">名前</label><input type="text" id="name" value="リスナー" maxlength="24" placeholder="例：ゆうり"><span></span></div>
-        <label class="check"><input type="checkbox" id="honor" checked> 名前に「さん」をつける</label>
+        <div class="inline">
+          <label class="check"><input type="checkbox" id="showName" checked> この種類で名前を出す</label>
+          <label class="check"><input type="checkbox" id="honor" checked> 名前に「さん」をつける</label>
+        </div>
         <div id="amountRow" class="row"><label for="amount" id="amountLabel">金額</label><input type="text" id="amount" maxlength="16"><span></span></div>
         <label class="check" id="autoRow"><input type="checkbox" id="scAuto" checked> 金額に合わせて色を変える</label>
         <div class="row"><label for="message">ひとこと</label><input type="text" id="message" value="" placeholder="例：これからもよろしくね！" maxlength="30"><span></span></div>
@@ -349,7 +352,7 @@ const cv = $('#stage'), ctx = cv.getContext('2d');
 const SIZES = { '16:9': [16, 9], '9:16': [9, 16], '1:1': [1, 1] };
 
 const KINDS = {
-  sub: { name: 'チャンネル登録', icon: 'bell', title: 'チャンネル登録\nありがとう！', color: '#ff6fa3', se: 'kira' },
+  sub: { name: 'チャンネル登録', icon: 'bell', title: 'チャンネル登録\nありがとう！', color: '#ff6fa3', se: 'kira', showName: false },
   sc: { name: 'スーパーチャット', icon: 'coin', title: 'スーパーチャット\nありがとう！', color: '#ffb300', se: 'charin', amount: '¥1,000', amountLabel: '金額' },
   member: { name: 'メンバーシップ', icon: 'crown', title: 'メンバー加入\nありがとう！', color: '#2fc48d', se: 'fanfare' },
   mgift: { name: 'メンバーギフト', icon: 'present', title: 'メンバーシップギフト\nありがとう！', color: '#2fc48d', se: 'fanfare' },
@@ -357,11 +360,12 @@ const KINDS = {
 };
 // スパチャの金額帯の色（円）
 const SC_TIERS = [[10000, '#ff3b4e'], [5000, '#ff4fa3'], [2000, '#ff8a2a'], [1000, '#ffb300'], [500, '#1fd1a5'], [200, '#22c3e6'], [0, '#4a8dff']];
+const kindDefaults = (d) => ({ title: d.title, amount: d.amount || '', color: d.color, se: d.se, showName: d.showName !== false });
 const SWATCHES = ['#ff6fa3', '#ff8a5c', '#ffb300', '#2fc48d', '#22c3e6', '#4a8dff', '#9b6bff', '#ff4fd8', '#8a6a5a'];
 
 const st = {
   kind: 'sub', aspect: '16:9', res: 1080, bg: 'alpha',
-  per: Object.fromEntries(Object.entries(KINDS).map(([k, d]) => [k, { title: d.title, amount: d.amount || '', color: d.color, se: d.se }])),
+  per: Object.fromEntries(Object.entries(KINDS).map(([k, d]) => [k, kindDefaults(d)])),
   scAuto: true, name: 'リスナー', honor: true, message: '', font: 'pop', textSize: 1, showIcon: true,
   img: null, bgImg: null, scale: 1, posX: 0, posY: 0, flip: false,
   seBuf: null, seOffset: 0, seVol: 0.8, blips: true,
@@ -373,6 +377,8 @@ const st = {
 };
 const OVERLAY = new URLSearchParams(location.search).has('overlay');
 const per = () => st.per[st.kind];
+// 名前を出すかどうかは種類ごと（チャンネル登録は誰か分からないことが多いので最初は出さない）
+const nameText = () => (st.name && per().showName !== false ? st.name + (st.honor ? 'さん' : '') : '');
 
 // ---------- helpers ----------
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -572,7 +578,7 @@ function layout(c, W, H) {
 
   const R = st.showIcon ? 78 * g : 0;
   const fs2 = 40 * g, fs4 = 44 * g, fs3 = 30 * g;
-  const name = st.name ? st.name + (st.honor ? 'さん' : '') : '';
+  const name = nameText();
   const amount = KINDS[st.kind].amountLabel ? per().amount : '';
   const hasRow = !!(name || amount);
   const iconH = R ? R * 2.15 : 0;
@@ -893,7 +899,7 @@ function scheduleAudio(t0) {
   const T = timeline();
   SE[per().se].play(se, t0 + T_ICON);
   if (st.blips) for (let i = 0; i < T.n; i++) { const f = 640 + (i % 8) * 45; tone(se, 'sine', f, f * 1.8, t0 + T_TITLE + i * LSTEP + 0.06, 0.002, 0.05, 0.05); }
-  if (st.name) tone(se, 'triangle', 600, 1300, t0 + T.tName, 0.003, 0.1, 0.12);
+  if (nameText()) tone(se, 'triangle', 600, 1300, t0 + T.tName, 0.003, 0.1, 0.12);
   if (KINDS[st.kind].amountLabel && per().amount) { tone(se, 'sine', 2637, 0, t0 + T.tAmt + 0.05, 0.002, 0.4, 0.07); tone(se, 'sine', 3520, 0, t0 + T.tAmt + 0.12, 0.002, 0.5, 0.06); }
   if (st.outro) tone(se, 'sine', 900, 300, t0 + T.oStart + 0.1, 0.002, 0.12, 0.12);
 }
@@ -1013,6 +1019,7 @@ function syncKind() {
   $('#color').value = themeColor();
   document.querySelectorAll('#seChips input').forEach((i) => (i.checked = i.value === p.se));
   $('#seFileRow').hidden = p.se !== 'custom';
+  $('#showName').checked = p.showName !== false;
   const icon = p.iconData;
   if (icon) $('#iconThumb').src = icon; else $('#iconThumb').removeAttribute('src');
   $('#iconLabel').textContent = icon ? 'アイコン画像を変える' : 'アイコンを自分の画像にする';
@@ -1085,6 +1092,7 @@ bindRange('gy', String, (v) => (st.gy = v));
 const check = (id, key) => $('#' + id).addEventListener('change', (e) => { st[key] = e.target.checked; drawStill(); });
 check('honor', 'honor'); check('showIcon', 'showIcon'); check('flip', 'flip'); check('outro', 'outro'); check('blips', 'blips');
 $('#font').addEventListener('change', (e) => { st.font = e.target.value; drawStill(); });
+$('#showName').addEventListener('change', (e) => { per().showName = e.target.checked; drawStill(); });
 const onText = () => {
   per().title = $('#title').value; per().amount = $('#amount').value.trim();
   st.name = $('#name').value.trim(); st.message = $('#message').value.trim();
@@ -1254,7 +1262,7 @@ async function applySettings(o) {
   const trig = st.triggers;
   SAVE_KEYS.forEach((k) => { if (k in o) st[k] = o[k]; });
   st.triggers = { ...trig, ...(o.triggers || {}) };
-  Object.entries(KINDS).forEach(([k, d]) => { st.per[k] = { title: d.title, amount: d.amount || '', color: d.color, se: d.se, ...(st.per[k] || {}) }; });
+  Object.entries(KINDS).forEach(([k, d]) => { st.per[k] = { ...kindDefaults(d), ...(st.per[k] || {}) }; });
   st.iconImgs = {};
   for (const k of Object.keys(KINDS)) if (st.per[k].iconData) st.iconImgs[k] = await imageFrom(st.per[k].iconData).catch(() => null);
   st.img = st.imgData ? await imageFrom(st.imgData).catch(() => null) : null;
