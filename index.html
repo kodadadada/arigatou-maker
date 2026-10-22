@@ -156,6 +156,14 @@ input[type=color] { width: 44px; height: 32px; border: 2px solid var(--line); bo
 .oc-list strong { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-list span { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .oc-empty { margin: 0; font-size: 12.5px; color: var(--muted); }
+.sub-label { font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.steps { padding-left: 1.4em; display: grid; gap: 4px; }
+.steps code, .hint code { font-size: 12px; background: var(--panel-2); padding: 1px 6px; border-radius: 6px; word-break: break-all; }
+.steps button { padding: 2px 10px; font-size: 12px; margin-top: 4px; }
+/* OBS のブラウザソース用（?overlay）：キャンバスだけを透明な画面いっぱいに出す */
+body.overlay { background: transparent; overflow: hidden; }
+body.overlay > .wrap { display: none; }
+body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; max-height: none; max-width: none; object-fit: contain; border-radius: 0; }
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .swatches button { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 2px var(--line); }
 .swatches button:hover { box-shadow: 0 0 0 2px var(--pink); }
@@ -220,6 +228,24 @@ input[type=color] { width: 44px; height: 32px; border: 2px solid var(--line); bo
           <label class="check"><input type="checkbox" id="ocGifts" checked> スパチャ・メンバー・ギフトだけ表示</label>
           <div class="oc-list" id="ocList"></div>
         </div>
+      </section>
+
+      <section class="card">
+        <h2>わんコメテンプレートとして使う</h2>
+        <p class="hint">OBS に置いておくと、スパチャなどが届いたときに自動でこの演出が流れます（続けて届いたら順番に流れます）。</p>
+        <div class="sub-label">自動で出すもの</div>
+        <div id="trigChecks" style="display:grid;gap:6px"></div>
+        <div class="inline">
+          <button type="button" class="primary" id="setSave">設定を保存（settings.json）</button>
+          <button type="button" id="setLoad">設定を読み込む</button>
+        </div>
+        <input type="file" id="setInput" accept=".json,application/json">
+        <ol class="hint steps">
+          <li>わんコメのカスタムテンプレートのフォルダに <code>arigatou-maker</code> フォルダ（index.html と template.json）を置く</li>
+          <li>上のボタンで保存した settings.json を、そのフォルダに入れる</li>
+          <li>OBS のブラウザソースに次の URL を貼る（幅 1920・高さ 1080）<br><code id="obsUrl"></code> <button type="button" id="obsCopy">コピー</button></li>
+        </ol>
+        <p class="hint">設定を変えたら settings.json を上書き保存するだけで、次の演出から反映されます。OBS でソースを右クリック →「対話」→ 画面をクリック（または T キー）でテスト再生できます。</p>
       </section>
 
       <section class="card">
@@ -317,6 +343,7 @@ const KINDS = {
   sub: { name: 'チャンネル登録', icon: 'bell', title: 'チャンネル登録\nありがとう！', color: '#ff6fa3', se: 'kira' },
   sc: { name: 'スーパーチャット', icon: 'coin', title: 'スーパーチャット\nありがとう！', color: '#ffb300', se: 'charin', amount: '¥1,000', amountLabel: '金額' },
   member: { name: 'メンバーシップ', icon: 'crown', title: 'メンバー加入\nありがとう！', color: '#2fc48d', se: 'fanfare' },
+  mgift: { name: 'メンバーギフト', icon: 'present', title: 'メンバーシップギフト\nありがとう！', color: '#2fc48d', se: 'fanfare' },
   jewel: { name: 'ジュエル', icon: 'gem', title: 'ジュエル\nありがとう！', color: '#9b6bff', se: 'kira', amount: '300ジュエル', amountLabel: 'ジュエル数' },
 };
 // スパチャの金額帯の色（円）
@@ -330,7 +357,11 @@ const st = {
   img: null, bgImg: null, scale: 1, posX: 0, posY: 0, flip: false,
   seBuf: null, seOffset: 0, seVol: 0.8, blips: true,
   dur: 5, outro: true, gScale: 1, gx: 0, gy: 0,
+  // わんコメテンプレートで自動で流す種類と、settings.json に入れる画像・音（data URL）
+  triggers: { sc: true, mgift: true, member: false, jewel: false },
+  imgData: null, bgData: null, seData: null,
 };
+const OVERLAY = new URLSearchParams(location.search).has('overlay');
 const per = () => st.per[st.kind];
 
 // ---------- helpers ----------
@@ -426,6 +457,26 @@ const ICONS = {
       c.fillStyle = col; tips.forEach(([x, y]) => { c.beginPath(); c.arc(x * R, y * R - 0.06 * R, 0.08 * R, 0, Math.PI * 2); c.fill(); });
       c.fillStyle = '#f0a020'; c.fillRect(-0.62 * R, 0.24 * R, 1.24 * R, 0.09 * R);
       c.fillStyle = col; c.beginPath(); heartPath(c, 0, 0.1 * R, 0.13 * R); c.fill();
+    } };
+  },
+  present(c, R, col) {
+    const body = () => {
+      c.beginPath();
+      c.rect(-0.56 * R, -0.12 * R, 1.12 * R, 0.74 * R);
+      c.rect(-0.66 * R, -0.38 * R, 1.32 * R, 0.28 * R);
+      c.moveTo(0, -0.38 * R); c.bezierCurveTo(-0.5 * R, -0.92 * R, -0.66 * R, -0.3 * R, 0, -0.38 * R);
+      c.moveTo(0, -0.38 * R); c.bezierCurveTo(0.5 * R, -0.92 * R, 0.66 * R, -0.3 * R, 0, -0.38 * R);
+    };
+    return { path: body, fill() {
+      const gr = c.createLinearGradient(0, -0.12 * R, 0, 0.62 * R); gr.addColorStop(0, mix(col, '#ffffff', 0.45)); gr.addColorStop(1, col);
+      c.fillStyle = gr; c.fillRect(-0.56 * R, -0.12 * R, 1.12 * R, 0.74 * R);
+      c.fillStyle = mix(col, '#ffffff', 0.3); c.fillRect(-0.66 * R, -0.38 * R, 1.32 * R, 0.28 * R);
+      c.fillStyle = '#ffd84a'; c.fillRect(-0.11 * R, -0.38 * R, 0.22 * R, 1.0 * R);
+      c.beginPath();
+      c.moveTo(0, -0.38 * R); c.bezierCurveTo(-0.5 * R, -0.92 * R, -0.66 * R, -0.3 * R, 0, -0.38 * R);
+      c.moveTo(0, -0.38 * R); c.bezierCurveTo(0.5 * R, -0.92 * R, 0.66 * R, -0.3 * R, 0, -0.38 * R);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.7)'; c.fillRect(-0.48 * R, -0.02 * R, 0.1 * R, 0.4 * R);
     } };
   },
   gem(c, R, col) {
@@ -815,7 +866,10 @@ function scheduleAudio(t0) {
 
 // ---------- playback / recording ----------
 let anim = 0, playing = false;
-function drawStill() { cancelAnimationFrame(anim); playing = false; render(ctx, timeline().hero, cv.width, cv.height); }
+function drawStill() {
+  cancelAnimationFrame(anim); playing = false;
+  if (OVERLAY) { ctx.clearRect(0, 0, cv.width, cv.height); return; } // OBS 用は待機中なにも映さない
+  render(ctx, timeline().hero, cv.width, cv.height); }
 // 映像は performance.now() で進める（音声が止められていても再生・書き出しが最後まで進むように）
 async function play(onDone) {
   ensureAudio();
@@ -967,6 +1021,7 @@ $('#seInput').addEventListener('change', async (e) => {
   ensureAudio();
   try {
     st.seBuf = await actx.decodeAudioData(await f.arrayBuffer());
+    st.seData = await readDataURL(f);
     $('#seFileName').textContent = `${f.name}（${st.seBuf.duration.toFixed(1)}秒）`;
     msg('効果音を読み込みました。▶ 再生で映像と合わせて確認できます。');
     previewSound();
@@ -1001,28 +1056,30 @@ const onText = () => {
 };
 ['#title', '#amount', '#name', '#message'].forEach((s) => $(s).addEventListener('input', onText));
 
-function loadImage(file) {
-  return new Promise((res, rej) => {
-    const url = URL.createObjectURL(file), im = new Image();
-    im.onload = () => res({ im, url }); im.onerror = () => rej(new Error('bad image')); im.src = url;
-  });
+// 画像・音は data URL で持っておく（settings.json にそのまま入れられるように）
+function readDataURL(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 }
+function imageFrom(url) {
+  return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('bad image')); im.src = url; });
+}
+async function loadImage(file) { const url = await readDataURL(file); return { im: await imageFrom(url), url }; }
 async function setCharFile(file) {
   if (!file || !file.type.startsWith('image/')) { msg('画像ファイル（PNG・JPG・WebP など）を選んでください。', true); return; }
   try {
-    const { im, url } = await loadImage(file); st.img = im; $('#imgThumb').src = url;
+    const { im, url } = await loadImage(file); st.img = im; st.imgData = url; $('#imgThumb').src = url;
     $('#imgLabel').textContent = '画像を変える'; $('#charCtl').hidden = false;
     msg(`「${file.name || '貼り付けた画像'}」を読み込みました。▶ 再生で確認できます。`); drawStill();
   } catch (e) { msg('画像を読み込めませんでした。別の形式で保存し直してみてください。', true); }
 }
 $('#imgInput').addEventListener('change', (e) => setCharFile(e.target.files[0]));
 $('#imgClear').addEventListener('click', () => {
-  st.img = null; $('#imgThumb').removeAttribute('src'); $('#imgInput').value = '';
+  st.img = null; st.imgData = null; $('#imgThumb').removeAttribute('src'); $('#imgInput').value = '';
   $('#imgLabel').textContent = '画像を選ぶ（なくてもOK）'; $('#charCtl').hidden = true; drawStill();
 });
 $('#bgInput').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { const { im, url } = await loadImage(f); st.bgImg = im; $('#bgThumb').src = url; drawStill(); }
+  try { const { im, url } = await loadImage(f); st.bgImg = im; st.bgData = url; $('#bgThumb').src = url; drawStill(); }
   catch (err) { msg('背景画像を読み込めませんでした。', true); }
 });
 
@@ -1039,22 +1096,38 @@ document.addEventListener('paste', (e) => {
 // ---------- わんコメ連携 ----------
 // わんコメのテンプレート用 SDK と同じ WebSocket（ws://localhost:11180/sub?p=comments）に直接つなぐ
 const oc = { ws: null, items: [], seen: new Set() };
-const OC_TAG = { sc: 'スパチャ', member: 'メンバー', jewel: 'ジュエル', sub: '登録', gift: 'ギフト' };
+const OC_TAG = { sc: 'スパチャ', mgift: 'メンバーギフト', member: 'メンバー', jewel: 'ジュエル', sub: '登録', gift: 'ギフト' };
 function ocKind(d) {
   if (/ジュエル|jewel/i.test(d.paidText || '')) return 'jewel';
+  if (d.giftType === 'sponsorgift') return 'mgift';
   if (d.giftType === 'superchat' || d.giftType === 'supersticker' || (d.price > 0 && d.paidText)) return 'sc';
-  if (d.membership || ['sponsorgift', 'giftreceived', 'milestonechat'].includes(d.giftType)) return 'member';
+  if (d.membership || ['giftreceived', 'milestonechat'].includes(d.giftType)) return 'member';
   if (d.giftType === 'subscribe') return 'sub';
   return d.hasGift ? 'gift' : null;
+}
+function ocItem(d) {
+  const name = (d.nickname || d.displayName || d.name || '').replace(/^@/, '').trim();
+  return { id: d.id, name, kind: ocKind(d), amount: d.paidText || '', text: (d.comment || '').replace(/<[^>]*>/g, '').trim() };
+}
+// わんコメが配信しているページ（テンプレートとして開いたとき）は同じホスト・ポートへ、それ以外は localhost へ
+function ocSocket(port, on) {
+  const fromOC = !!location.port && location.pathname.includes('/templates/');
+  const ws = new WebSocket(`ws://${fromOC ? location.hostname : 'localhost'}:${fromOC ? location.port : port}/sub?p=comments`);
+  ws.addEventListener('message', (e) => {
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    const list = ((m.data && m.data.comments) || []).filter((cm) => cm && cm.data && cm.data.id && !cm.data.isOwner);
+    if (m.type === 'connected' || (m.type === 'comments' && m.data.options && m.data.options.init)) on.history(list);
+    else if (m.type === 'comments') on.comments(list);
+    else if (m.type === 'clear' && on.clear) on.clear();
+    else if (m.type === 'deleted' && Array.isArray(m.data) && on.deleted) on.deleted(m.data.map((x) => x.id));
+  });
+  return ws;
 }
 const ocStatus = (text, warn) => { const el = $('#ocStatus'); el.textContent = text; el.style.color = warn ? 'var(--warn)' : ''; };
 function ocAdd(comments) {
   comments.forEach((cm) => {
-    const d = cm.data; if (!d || oc.seen.has(d.id)) return;
-    const name = (d.nickname || d.displayName || d.name || '').replace(/^@/, '').trim();
-    if (!name || d.isOwner) return;
-    oc.seen.add(d.id);
-    oc.items.unshift({ id: d.id, name, kind: ocKind(d), amount: d.paidText || '', text: (d.comment || '').replace(/<[^>]*>/g, '').trim() });
+    const it = ocItem(cm.data); if (!it.name || oc.seen.has(it.id)) return;
+    oc.seen.add(it.id); oc.items.unshift(it);
   });
   oc.items.length = Math.min(oc.items.length, 100);
   ocRender();
@@ -1087,21 +1160,19 @@ function ocApply(it) {
 }
 function ocConnect() {
   if (oc.ws) { oc.ws.close(); return; }
-  const port = parseInt($('#ocPort').value, 10) || 11180;
-  let ws;
-  try { ws = new WebSocket(`ws://localhost:${port}/sub?p=comments`); }
-  catch (e) { ocStatus('わんコメにつなげませんでした。', true); return; }
-  oc.ws = ws; let opened = false;
+  let ws, opened = false;
+  try {
+    ws = ocSocket(parseInt($('#ocPort').value, 10) || 11180, {
+      history: ocAdd, comments: ocAdd,
+      clear() { oc.items = []; oc.seen.clear(); ocRender(); },
+      deleted(ids) { const s = new Set(ids); oc.items = oc.items.filter((it) => !s.has(it.id)); ocRender(); },
+    });
+  } catch (e) { ocStatus('わんコメにつなげませんでした。', true); return; }
+  oc.ws = ws;
   ocStatus('つないでいます…');
   ws.addEventListener('open', () => {
     opened = true; $('#ocBtn').textContent = '切断する'; $('#ocBox').hidden = false;
     ocStatus('つながりました。名前をクリックすると入ります。'); ocRender();
-  });
-  ws.addEventListener('message', (e) => {
-    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-    if (m.type === 'connected' || m.type === 'comments') ocAdd((m.data && m.data.comments) || []);
-    else if (m.type === 'clear') { oc.items = []; oc.seen.clear(); ocRender(); }
-    else if (m.type === 'deleted' && Array.isArray(m.data)) { const ids = new Set(m.data.map((x) => x.id)); oc.items = oc.items.filter((it) => !ids.has(it.id)); ocRender(); }
   });
   ws.addEventListener('close', () => {
     if (oc.ws === ws) oc.ws = null;
@@ -1118,6 +1189,125 @@ function ocConnect() {
 $('#ocBtn').addEventListener('click', ocConnect);
 $('#ocGifts').addEventListener('change', ocRender);
 
+// ---------- 設定ファイル（settings.json） ----------
+const SAVE_KEYS = ['aspect', 'res', 'bg', 'per', 'scAuto', 'honor', 'font', 'textSize', 'showIcon', 'scale', 'posX', 'posY', 'flip',
+  'seOffset', 'seVol', 'blips', 'dur', 'outro', 'gScale', 'gx', 'gy', 'triggers', 'imgData', 'bgData', 'seData'];
+const TRIGGERS = { sc: 'スーパーチャット・スーパーステッカー（名前と金額）', mgift: 'メンバーシップギフト（贈った人の名前）', member: 'メンバー加入（名前）', jewel: 'ジュエル（名前と数）' };
+const settingsJSON = () => JSON.stringify({ app: 'arigatou-maker', version: 1, ...Object.fromEntries(SAVE_KEYS.map((k) => [k, st[k]])) });
+async function applySettings(o) {
+  if (!o || o.app !== 'arigatou-maker') throw new Error('not settings');
+  const trig = st.triggers;
+  SAVE_KEYS.forEach((k) => { if (k in o) st[k] = o[k]; });
+  st.triggers = { ...trig, ...(o.triggers || {}) };
+  Object.entries(KINDS).forEach(([k, d]) => { st.per[k] = { title: d.title, amount: d.amount || '', color: d.color, se: d.se, ...(st.per[k] || {}) }; });
+  st.img = st.imgData ? await imageFrom(st.imgData).catch(() => null) : null;
+  st.bgImg = st.bgData ? await imageFrom(st.bgData).catch(() => null) : null;
+  st.seBuf = null;
+  if (st.seData) {
+    ensureAudio();
+    try { st.seBuf = await actx.decodeAudioData(await (await fetch(st.seData)).arrayBuffer()); } catch (e) { st.seBuf = null; }
+  }
+}
+// 読み込んだ設定を画面のつまみ・チェックに反映する
+function syncUI() {
+  const ranges = { textSize: st.textSize * 100, scale: st.scale * 100, posX: st.posX, posY: st.posY, seOffset: st.seOffset * 100,
+    seVol: st.seVol * 100, dur: st.dur * 10, gScale: st.gScale * 100, gx: st.gx, gy: st.gy };
+  Object.entries(ranges).forEach(([id, v]) => { const el = $('#' + id); el.value = Math.round(v); el.dispatchEvent(new Event('input')); });
+  ['honor', 'showIcon', 'flip', 'outro', 'blips', 'scAuto'].forEach((k) => ($('#' + k).checked = !!st[k]));
+  Object.keys(TRIGGERS).forEach((k) => ($('#trig-' + k).checked = !!st.triggers[k]));
+  $('#font').value = st.font;
+  const bg = document.querySelector(`#bgChips input[value="${st.bg}"]`); if (bg) { bg.checked = true; bg.dispatchEvent(new Event('change')); }
+  document.querySelectorAll('#aspectSeg button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.aspect === st.aspect));
+  document.querySelectorAll('#resSeg button').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.res === st.res));
+  if (st.imgData) { $('#imgThumb').src = st.imgData; $('#imgLabel').textContent = '画像を変える'; $('#charCtl').hidden = false; }
+  else { $('#imgThumb').removeAttribute('src'); $('#imgLabel').textContent = '画像を選ぶ（なくてもOK）'; $('#charCtl').hidden = true; }
+  if (st.bgData) $('#bgThumb').src = st.bgData;
+  $('#seFileName').textContent = st.seBuf ? `保存されていた効果音（${st.seBuf.duration.toFixed(1)}秒）` : '効果音ファイルを選ぶ';
+  syncKind(); setSize();
+}
+Object.entries(TRIGGERS).forEach(([k, label]) => {
+  const l = document.createElement('label'); l.className = 'check';
+  l.innerHTML = `<input type="checkbox" id="trig-${k}"${st.triggers[k] ? ' checked' : ''}> <span></span>`;
+  l.querySelector('span').textContent = label;
+  l.querySelector('input').addEventListener('change', (e) => (st.triggers[k] = e.target.checked));
+  $('#trigChecks').append(l);
+});
+$('#setSave').addEventListener('click', async () => {
+  const blob = new Blob([settingsJSON()], { type: 'application/json' });
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: 'settings.json', types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] });
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      msg(`${h.name} を保存しました。テンプレートのフォルダに置くと OBS の演出に反映されます。`); return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  download('settings.json', blob);
+});
+$('#setLoad').addEventListener('click', () => $('#setInput').click());
+$('#setInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { await applySettings(JSON.parse(await f.text())); syncUI(); await loadFonts(); drawStill(); msg('設定を読み込みました。'); }
+  catch (err) { msg('この設定ファイルは読み込めませんでした。このツールで保存した settings.json を選んでください。', true); }
+  e.target.value = '';
+});
+const OBS_URL = 'http://localhost:11180/templates/custom/arigatou-maker/?overlay';
+$('#obsUrl').textContent = OBS_URL;
+$('#obsCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(OBS_URL); msg('OBS 用の URL をコピーしました。'); } catch (e) { msg('コピーできませんでした。URL を選択してコピーしてください。', true); }
+});
+
+// ---------- わんコメテンプレート（OBS のブラウザソース用の表示） ----------
+// 待機中は透明。スパチャなどが届いたら1件ずつ順番に演出を流す
+const queue = [];
+let busy = false, settingsText = '';
+async function loadSettingsFile() {
+  try {
+    const r = await fetch('settings.json', { cache: 'no-store' }); if (!r.ok) return;
+    const txt = await r.text(); if (txt === settingsText) return;
+    await applySettings(JSON.parse(txt)); settingsText = txt; setSize();
+  } catch (e) { console.warn('settings.json を読み込めませんでした', e); }
+}
+async function pump() {
+  if (busy || !queue.length) return;
+  busy = true;
+  const it = queue.shift();
+  await loadSettingsFile(); // 保存し直した settings.json は次の演出から反映
+  st.kind = it.kind; st.name = it.name;
+  if (KINDS[it.kind].amountLabel) per().amount = it.amount || '';
+  await loadFonts();
+  play(() => { ctx.clearRect(0, 0, cv.width, cv.height); busy = false; setTimeout(pump, 400); });
+}
+function overlayConnect() {
+  let ws;
+  try {
+    ws = ocSocket(11180, {
+      history: (list) => list.forEach((cm) => oc.seen.add(cm.data.id)), // つないだ時点までのコメントは流さない
+      comments: (list) => list.forEach((cm) => {
+        if (oc.seen.has(cm.data.id)) return;
+        oc.seen.add(cm.data.id);
+        const it = ocItem(cm.data);
+        if (it.name && st.triggers[it.kind]) { queue.push(it); pump(); }
+      }),
+    });
+  } catch (e) { setTimeout(overlayConnect, 3000); return; }
+  ws.addEventListener('close', () => setTimeout(overlayConnect, 3000));
+}
+const TESTS = { sc: { name: 'テスト', amount: '¥1,000' }, mgift: { name: 'テスト' }, member: { name: 'テスト' }, jewel: { name: 'テスト', amount: '100ジュエル' } };
+let testIdx = 0;
+function testEvent() {
+  const ks = Object.keys(TESTS).filter((k) => st.triggers[k]);
+  if (ks.length) { const k = ks[testIdx++ % ks.length]; queue.push({ kind: k, ...TESTS[k] }); pump(); }
+}
+async function overlayBoot() {
+  document.body.classList.add('overlay'); document.body.append(cv);
+  await loadSettingsFile(); setSize(); await loadFonts();
+  overlayConnect();
+  // OBS の「対話」からクリック、または T キーでテスト再生
+  cv.addEventListener('click', testEvent);
+  addEventListener('keydown', (e) => { if (e.key === 't' || e.key === 'T') testEvent(); });
+  if (new URLSearchParams(location.search).has('test')) testEvent();
+}
+
 $('#playBtn').addEventListener('click', () => play());
 $('#recBtn').addEventListener('click', record);
 $('#saveBtn').addEventListener('click', () => lastBlob && download(`thanks-${st.kind}.${lastExt}`, lastBlob));
@@ -1127,9 +1317,12 @@ $('#pngBtn').addEventListener('click', () => {
 });
 
 // ---------- boot ----------
-syncKind();
-setSize();
-loadFonts().then(() => { syncKind(); drawStill(); });
+if (OVERLAY) overlayBoot();
+else {
+  syncKind();
+  setSize();
+  loadFonts().then(() => { syncKind(); drawStill(); });
+}
 })();
 </script>
 </body>
