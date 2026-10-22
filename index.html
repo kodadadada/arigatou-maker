@@ -268,15 +268,6 @@ body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; ma
           </select><span></span></div>
         <div class="row"><label for="textSize">文字の大きさ</label><input type="range" id="textSize" min="50" max="150" value="100"><output id="textSizeOut">100%</output></div>
         <label class="check"><input type="checkbox" id="showIcon" checked> アイコン（ベル・コインなど）を出す</label>
-        <label class="drop" for="iconInput">
-          <img id="iconThumb" alt="">
-          <div><strong id="iconLabel">アイコンを自分の画像にする</strong><span>いま選んでいる種類のアイコンが、この画像になります（透過 PNG がおすすめ）</span></div>
-        </label>
-        <input type="file" id="iconInput" accept="image/*">
-        <div class="inline" id="iconBtns" hidden>
-          <button type="button" id="iconAll">すべての種類に使う</button>
-          <button type="button" id="iconClear">元のアイコンに戻す</button>
-        </div>
       </section>
 
       <section class="card">
@@ -373,7 +364,6 @@ const st = {
   // わんコメテンプレートで自動で流す種類と、settings.json に入れる画像・音（data URL）
   triggers: { sc: true, mgift: true, member: false, jewel: false },
   imgData: null, bgData: null, seData: null,
-  iconImgs: {}, // 種類ごとの自分のアイコン画像（元データは per[種類].iconData）
 };
 const OVERLAY = new URLSearchParams(location.search).has('overlay');
 const per = () => st.per[st.kind];
@@ -509,32 +499,8 @@ const ICONS = {
     } };
   },
 };
-// 自分の画像を、濃い縁＋白縁のステッカーにしておく（画像と色ごとに一度だけ作る）
-const stickerCache = new WeakMap();
-function sticker(im, col) {
-  let m = stickerCache.get(im); if (!m) stickerCache.set(im, (m = new Map()));
-  if (m.has(col)) return m.get(col);
-  const S = 360, k = S / Math.max(im.width, im.height), w = Math.round(im.width * k), h = Math.round(im.height * k), pad = 30;
-  const sil = document.createElement('canvas'); sil.width = w; sil.height = h;
-  const out = document.createElement('canvas'); out.width = w + pad * 2; out.height = h + pad * 2;
-  const sx = sil.getContext('2d'), ox = out.getContext('2d');
-  const ring = (color, r) => {
-    sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, w, h); sx.drawImage(im, 0, 0, w, h);
-    sx.globalCompositeOperation = 'source-in'; sx.fillStyle = color; sx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; ox.drawImage(sil, pad + Math.cos(a) * r, pad + Math.sin(a) * r); }
-  };
-  ring(mix(col, '#3a1030', 0.45), pad * 0.95); ring('#ffffff', pad * 0.6);
-  ox.drawImage(im, pad, pad, w, h);
-  m.set(col, out); return out;
-}
 function drawIcon(c, kind, x, y, R, col, rot = 0, sc = 1) {
   if (sc <= 0) return;
-  const own = st.iconImgs[kind];
-  if (own) {
-    const s = sticker(own, col), k = (R * 1.75) / Math.max(s.width, s.height);
-    c.save(); c.translate(x, y); c.rotate(rot); c.scale(sc * k, sc * k); c.drawImage(s, -s.width / 2, -s.height / 2); c.restore();
-    return;
-  }
   const ic = ICONS[KINDS[kind].icon](c, R, col);
   c.save(); c.translate(x, y); c.rotate(rot); c.scale(sc, sc);
   c.lineJoin = 'round'; c.lineCap = 'round';
@@ -1020,10 +986,6 @@ function syncKind() {
   document.querySelectorAll('#seChips input').forEach((i) => (i.checked = i.value === p.se));
   $('#seFileRow').hidden = p.se !== 'custom';
   $('#showName').checked = p.showName !== false;
-  const icon = p.iconData;
-  if (icon) $('#iconThumb').src = icon; else $('#iconThumb').removeAttribute('src');
-  $('#iconLabel').textContent = icon ? 'アイコン画像を変える' : 'アイコンを自分の画像にする';
-  $('#iconBtns').hidden = !icon;
   kindsEl.querySelectorAll('.kind').forEach((b) => iconCanvas(b.querySelector('canvas'), b.dataset.kind, b.dataset.kind === st.kind ? themeColor() : KINDS[b.dataset.kind].color));
   iconCanvas($('#logo'), st.kind, themeColor());
 }
@@ -1119,23 +1081,6 @@ async function setCharFile(file) {
   } catch (e) { msg('画像を読み込めませんでした。別の形式で保存し直してみてください。', true); }
 }
 $('#imgInput').addEventListener('change', (e) => setCharFile(e.target.files[0]));
-$('#iconInput').addEventListener('change', async (e) => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  if (!f.type.startsWith('image/')) { msg('画像ファイル（PNG・JPG・WebP など）を選んでください。', true); return; }
-  try {
-    const { im, url } = await loadImage(f); per().iconData = url; st.iconImgs[st.kind] = im;
-    syncKind(); drawStill(); msg(`「${KINDS[st.kind].name}」のアイコンを自分の画像にしました。`);
-  } catch (err) { msg('画像を読み込めませんでした。別の形式で保存し直してみてください。', true); }
-});
-$('#iconAll').addEventListener('click', () => {
-  const url = per().iconData, im = st.iconImgs[st.kind]; if (!url) return;
-  Object.keys(KINDS).forEach((k) => { st.per[k].iconData = url; st.iconImgs[k] = im; });
-  syncKind(); drawStill(); msg('すべての種類のアイコンを同じ画像にしました。');
-});
-$('#iconClear').addEventListener('click', () => {
-  delete per().iconData; delete st.iconImgs[st.kind];
-  syncKind(); drawStill(); msg(`「${KINDS[st.kind].name}」のアイコンを元に戻しました。`);
-});
 $('#imgClear').addEventListener('click', () => {
   st.img = null; st.imgData = null; $('#imgThumb').removeAttribute('src'); $('#imgInput').value = '';
   $('#imgLabel').textContent = '画像を選ぶ（なくてもOK）'; $('#charCtl').hidden = true; drawStill();
@@ -1263,8 +1208,7 @@ async function applySettings(o) {
   SAVE_KEYS.forEach((k) => { if (k in o) st[k] = o[k]; });
   st.triggers = { ...trig, ...(o.triggers || {}) };
   Object.entries(KINDS).forEach(([k, d]) => { st.per[k] = { ...kindDefaults(d), ...(st.per[k] || {}) }; });
-  st.iconImgs = {};
-  for (const k of Object.keys(KINDS)) if (st.per[k].iconData) st.iconImgs[k] = await imageFrom(st.per[k].iconData).catch(() => null);
+  Object.values(st.per).forEach((p) => delete p.iconData); // 以前の版で保存したアイコン画像は使わない
   st.img = st.imgData ? await imageFrom(st.imgData).catch(() => null) : null;
   st.bgImg = st.bgData ? await imageFrom(st.bgData).catch(() => null) : null;
   st.seBuf = null;
