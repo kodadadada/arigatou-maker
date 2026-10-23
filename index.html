@@ -261,7 +261,7 @@ body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; ma
       <section class="card">
         <h2>文字</h2>
         <div class="row"><label for="title">メイン</label><textarea id="title" rows="2" maxlength="40"></textarea><span></span></div>
-        <div class="row"><label for="name">名前</label><input type="text" id="name" value="リスナー" maxlength="24" placeholder="例：ゆうり"><span></span></div>
+        <p class="hint">名前はわんコメから自動で入ります（プレビューでは「<span id="namePreview">リスナー</span>」と表示）。</p>
         <div class="inline">
           <label class="check"><input type="checkbox" id="showName" checked> この種類で名前を出す</label>
           <label class="check"><input type="checkbox" id="honor" checked> 名前に「さん」をつける</label>
@@ -1067,12 +1067,12 @@ $('#font').addEventListener('change', (e) => { st.font = e.target.value; drawSti
 $('#showName').addEventListener('change', (e) => { per().showName = e.target.checked; drawStill(); });
 const onText = () => {
   per().title = $('#title').value; per().amount = $('#amount').value.trim();
-  st.name = $('#name').value.trim(); st.message = $('#message').value.trim();
+  st.message = $('#message').value.trim();
   if (st.kind === 'sc') syncKind();
   loadFonts().then(() => { if (!playing) drawStill(); });
   if (!playing) drawStill();
 };
-['#title', '#amount', '#name', '#message'].forEach((s) => $(s).addEventListener('input', onText));
+['#title', '#amount', '#message'].forEach((s) => $(s).addEventListener('input', onText));
 
 // 画像・音は data URL で持っておく（settings.json にそのまま入れられるように）
 function readDataURL(file) {
@@ -1178,10 +1178,10 @@ function ocRender() {
 // 種類が分かるもの（スパチャ・メンバー・ジュエル・登録）は種類も切り替え、金額があれば金額も入れる
 function ocApply(it) {
   if (KINDS[it.kind]) setKind(it.kind);
-  st.name = it.name; $('#name').value = it.name;
+  st.name = it.name; $('#namePreview').textContent = it.name;
   if (it.amount && KINDS[st.kind].amountLabel) { per().amount = it.amount; $('#amount').value = it.amount; }
   syncKind(); loadFonts().then(() => { if (!playing) drawStill(); }); drawStill();
-  msg(`「${it.name}」を名前に入れました。`);
+  msg(`プレビューの名前を「${it.name}」にしました。`);
 }
 function ocConnect() {
   if (oc.ws) { oc.ws.close(); return; }
