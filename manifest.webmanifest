@@ -1,0 +1,16 @@
+{
+  "name": "ありがとう演出メーカー",
+  "short_name": "ありがとう",
+  "description": "チャンネル登録・スパチャ・メンバー・ジュエルのお礼モーションを作って動画で書き出せるツール",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff6fa",
+  "theme_color": "#ff5c9a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ありがとう演出メーカー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ff5c9a">
+<link rel="icon" type="image/png" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="description" content="チャンネル登録・スーパーチャット・メンバーシップ・ジュエルのお礼モーション動画を作って、透過WebMやMP4で書き出せるツール。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -177,6 +181,7 @@ body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; ma
       <h1>ありがとう演出メーカー</h1>
       <p class="lead">チャンネル登録・スパチャ・メンバー・ジュエルのお礼モーションを作って、そのまま動画で書き出せます。</p>
     </div>
+    <button type="button" class="primary" id="installBtn" style="margin-left:auto" hidden>アプリとして入れる</button>
   </header>
 
   <main>
@@ -1330,6 +1335,22 @@ $('#saveBtn').addEventListener('click', () => lastBlob && download(`thanks-${st.
 $('#pngBtn').addEventListener('click', () => {
   render(ctx, timeline().hero, cv.width, cv.height);
   cv.toBlob((b) => b && download(`thanks-${st.kind}.png`, b), 'image/png');
+});
+
+// ---------- アプリ（PWA） ----------
+// 公開ページ・localhost で開いたときだけ。わんコメのテンプレートとして開いたときは使わない
+if ('serviceWorker' in navigator && !OVERLAY && !location.pathname.includes('/templates/')
+  && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+let installPrompt = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; $('#installBtn').hidden = false; });
+addEventListener('appinstalled', () => { installPrompt = null; $('#installBtn').hidden = true; msg('アプリとして入れました。Dock やアプリ一覧から開けます。'); });
+$('#installBtn').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null; $('#installBtn').hidden = true;
 });
 
 // ---------- boot ----------
