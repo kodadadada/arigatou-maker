@@ -1191,6 +1191,12 @@ function ocConnect() {
       const host = location.hostname, local = !host || ['localhost', '127.0.0.1'].includes(host);
       ocStatus('わんコメにつながりませんでした。わんコメが起動しているか、ポート番号を確認してください。'
         + (local ? '' : `起動している場合は、わんコメの「設定 → API」に「${host}」を登録してから、もう一度押してください。`), true);
+      // テンプレートとして入れていれば、わんコメから開いたこのページは登録なしでつながる
+      if (!local) {
+        const a = document.createElement('a'); a.href = OC_EDITOR_URL; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = 'わんコメから開く（登録不要）';
+        $('#ocStatus').append(document.createElement('br'), 'または、テンプレートを入れてあれば ', a, ' と、そのままつながります。');
+      }
     }
   });
 }
@@ -1259,7 +1265,8 @@ $('#setInput').addEventListener('change', async (e) => {
   catch (err) { msg('この設定ファイルは読み込めませんでした。このツールで保存した settings.json を選んでください。', true); }
   e.target.value = '';
 });
-const OBS_URL = 'http://localhost:11180/templates/custom/arigatou-maker/?overlay';
+const OC_EDITOR_URL = 'http://localhost:11180/templates/custom/arigatou-maker/';
+const OBS_URL = OC_EDITOR_URL + '?overlay';
 $('#obsUrl').textContent = OBS_URL;
 $('#obsCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(OBS_URL); msg('OBS 用の URL をコピーしました。'); } catch (e) { msg('コピーできませんでした。URL を選択してコピーしてください。', true); }
