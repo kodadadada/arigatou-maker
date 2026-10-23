@@ -1114,18 +1114,25 @@ document.addEventListener('paste', (e) => {
 // ---------- わんコメ連携 ----------
 // わんコメのテンプレート用 SDK と同じ WebSocket（ws://localhost:11180/sub?p=comments）に直接つなぐ
 const oc = { ws: null, items: [], seen: new Set() };
-const OC_TAG = { sc: 'スパチャ', mgift: 'メンバーギフト', member: 'メンバー', jewel: 'ジュエル', sub: '登録', gift: 'ギフト' };
+const OC_TAG = { sc: 'スパチャ', mgift: 'メンバーギフト', member: 'メンバー加入', jewel: 'ジュエル', received: 'ギフト受取', milestone: 'メンバー歴', gift: 'ギフト' };
+// わんコメの YouTube の giftType：jewel＝ジュエル、sponsorgift＝メンバーシップギフトを贈った人、
+// subscribe＝メンバー加入（チャンネル登録ではない）、giftreceived＝ギフトを受け取った人、milestonechat＝メンバー歴のお知らせ
+// 自動で流すのは KINDS にある種類だけ（received・milestone は一覧に出すだけ）
 function ocKind(d) {
-  if (/ジュエル|jewel/i.test(d.paidText || '')) return 'jewel';
+  if (d.giftType === 'jewel' || /ジュエル|jewel|💎/i.test(d.paidText || '')) return 'jewel';
   if (d.giftType === 'sponsorgift') return 'mgift';
   if (d.giftType === 'superchat' || d.giftType === 'supersticker' || (d.price > 0 && d.paidText)) return 'sc';
-  if (d.membership || ['giftreceived', 'milestonechat'].includes(d.giftType)) return 'member';
-  if (d.giftType === 'subscribe') return 'sub';
+  if (d.giftType === 'subscribe' || (d.membership && !d.giftType)) return 'member';
+  if (d.giftType === 'giftreceived') return 'received';
+  if (d.giftType === 'milestonechat') return 'milestone';
   return d.hasGift ? 'gift' : null;
 }
 function ocItem(d) {
   const name = (d.nickname || d.displayName || d.name || '').replace(/^@/, '').trim();
-  return { id: d.id, name, kind: ocKind(d), amount: d.paidText || '', text: (d.comment || '').replace(/<[^>]*>/g, '').trim() };
+  const kind = ocKind(d);
+  // ジュエルの金額欄は「💎300」の形なので、文字化けしにくい「300ジュエル」に直す
+  const amount = kind === 'jewel' ? (d.price > 0 ? `${d.price}ジュエル` : '') : d.paidText || '';
+  return { id: d.id, name, kind, amount, text: (d.comment || '').replace(/<[^>]*>/g, '').trim() };
 }
 // わんコメが配信しているページ（テンプレートとして開いたとき）は同じホスト・ポートへ、それ以外は localhost へ
 function ocSocket(port, on) {
