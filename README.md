@@ -11,7 +11,16 @@
   - 透過：Chrome / Edge で書き出すと背景が透明な WebM になります（OBS のメディアソースにそのまま置けます）
   - グリーンバック：編集ソフトのクロマキー用。MP4 でも書き出せます
 
-## アプリとして入れる（Dock から開く）
+## Mac / Windows アプリ
+
+[Releases](https://github.com/kodadadada/arigatou-maker/releases) から、Mac 用（`.dmg`）と Windows 用（`.exe`）をダウンロードできます。署名していないので、初めて開くときに警告が出ます（開き方は Releases のページに書いてあります）。
+
+- 「わんコメに保存」を押すと、テンプレートと設定がまとめてわんコメのフォルダに入ります（settings.json を手で移す必要はありません）
+- わんコメの「設定 → API」に何も登録しなくても、わんコメにつながります
+
+開発用メモ：`npm install` → `npm start` で起動、`npm run dist:mac` で Mac 版を作成。`v1.0.0` のようなタグをプッシュすると、GitHub Actions が Mac 版と Windows 版を作って Releases に置きます（`package.json` の `version` もタグに合わせて上げてください）。Mac 版は、中の名前を英字（ArigatouMaker）にしないと起動しないため、日本語名は `build/ja.lproj` の表示名で出しています。
+
+## ブラウザからアプリとして入れる（PWA）
 
 公開ページ https://kodadadada.github.io/arigatou-maker/ はアプリ（PWA）として入れられます。一度開けば、ネットにつながっていなくても起動できます。公開ページを更新すると、次に開いたときアプリも新しくなります。
 

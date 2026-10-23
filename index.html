@@ -245,12 +245,17 @@ body.overlay #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; ma
           <button type="button" id="setLoad">設定を読み込む</button>
         </div>
         <input type="file" id="setInput" accept=".json,application/json">
-        <ol class="hint steps">
+        <ol class="hint steps" id="webSteps">
           <li>わんコメのカスタムテンプレートのフォルダに <code>arigatou-maker</code> フォルダ（index.html と template.json）を置く</li>
           <li>上のボタンで保存した settings.json を、そのフォルダに入れる</li>
-          <li>OBS のブラウザソースに次の URL を貼る（幅 1920・高さ 1080）<br><code id="obsUrl"></code> <button type="button" id="obsCopy">コピー</button></li>
+          <li>OBS のブラウザソースに下の URL を貼る（幅 1920・高さ 1080）</li>
         </ol>
-        <p class="hint">設定を変えたら settings.json を上書き保存するだけで、次の演出から反映されます。OBS でソースを右クリック →「対話」→ 画面をクリック（または T キー）でテスト再生できます。</p>
+        <ol class="hint steps" id="appSteps" hidden>
+          <li>わんコメを起動した状態で「わんコメに保存」を押す（テンプレートと設定がまとめてわんコメに入ります）</li>
+          <li>OBS のブラウザソースに下の URL を貼る（幅 1920・高さ 1080）</li>
+        </ol>
+        <p class="hint"><code id="obsUrl"></code> <button type="button" id="obsCopy">コピー</button></p>
+        <p class="hint" id="saveHint">設定を変えたら settings.json を上書き保存するだけで、次の演出から反映されます。OBS でソースを右クリック →「対話」→ 画面をクリック（または T キー）でテスト再生できます。</p>
       </section>
 
       <section class="card">
@@ -1252,7 +1257,22 @@ Object.entries(TRIGGERS).forEach(([k, label]) => {
   l.querySelector('input').addEventListener('change', (e) => (st.triggers[k] = e.target.checked));
   $('#trigChecks').append(l);
 });
+// Mac / Windows アプリ（Electron）で開いたときは、わんコメのフォルダに直接保存する
+const APP = window.arigatouApp;
+if (APP) {
+  $('#setSave').textContent = 'わんコメに保存';
+  $('#webSteps').hidden = true; $('#appSteps').hidden = false;
+  $('#saveHint').textContent = '設定を変えたら「わんコメに保存」を押すだけで、次の演出から反映されます。OBS でソースを右クリック →「対話」→ 画面をクリック（または T キー）でテスト再生できます。';
+}
 $('#setSave').addEventListener('click', async () => {
+  if (APP) {
+    try {
+      const r = await APP.saveToOneComme(settingsJSON());
+      if (r.ok) msg('わんコメにテンプレートと設定を保存しました。OBS の演出に次から反映されます。');
+      else msg('わんコメのフォルダが見つかりませんでした。わんコメを一度起動してから、もう一度押してください。', true);
+    } catch (e) { msg('わんコメに保存できませんでした。', true); }
+    return;
+  }
   const blob = new Blob([settingsJSON()], { type: 'application/json' });
   if (window.showSaveFilePicker) {
     try {
