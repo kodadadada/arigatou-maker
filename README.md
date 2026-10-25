@@ -13,7 +13,24 @@
 
 ## Mac / Windows アプリ
 
-[Releases](https://github.com/kodadadada/arigatou-maker/releases) から、Mac 用（`.dmg`）と Windows 用（`.exe`）をダウンロードできます。署名していないので、初めて開くときに警告が出ます（開き方は Releases のページに書いてあります）。
+[Releases](https://github.com/kodadadada/arigatou-maker/releases/latest) から、Mac 用（`.dmg`）と Windows 用（`.exe`）をダウンロードできます。署名していないので、そのままでは開けなかったり警告が出たりします。
+
+**Mac のインストール**
+
+ダウンロードした `.dmg` をそのまま開くと「**破損しているため開けません**」と出ます（ファイルは壊れていません。Apple の署名がないアプリを macOS が止めているだけです）。
+
+1. 「ターミナル」で次の1行を実行し、ダウンロードした `.dmg` から「インターネットから来た」という印を外します（何も表示されなければ成功）
+   ```bash
+   xattr -d com.apple.quarantine ~/Downloads/arigatou-maker-*-mac-*.dmg
+   ```
+2. `.dmg` を開き、「ArigatouMaker」を「Applications」フォルダにドラッグします
+3. 「アプリケーション」フォルダの「ありがとう演出メーカー」を起動します
+
+アプリを入れたあとで「破損している」と出た場合は、`xattr -dr com.apple.quarantine /Applications/ArigatouMaker.app` を実行してから開き直してください。
+
+**Windows のインストール**
+
+`.exe` を開き、「Windows によって PC が保護されました」と出たら「詳細情報」→「実行」を押します。
 
 - 「わんコメに保存」を押すと、テンプレートと設定がまとめてわんコメのフォルダに入ります（settings.json を手で移す必要はありません）
 - わんコメの「設定 → API」に何も登録しなくても、わんコメにつながります
