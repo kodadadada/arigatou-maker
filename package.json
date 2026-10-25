@@ -3,7 +3,7 @@
   "productName": "ArigatouMaker",
   "version": "1.0.2",
   "description": "チャンネル登録・スパチャ・メンバー・ジュエルのお礼モーションを作るツール",
-  "author": "kodadadada",
+  "author": "Passionect",
   "license": "UNLICENSED",
   "private": true,
   "main": "electron/main.js",

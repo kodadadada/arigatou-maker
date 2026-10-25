@@ -4,4 +4,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('arigatouApp', {
   saveToOneComme: (json) => ipcRenderer.invoke('save-onecomme', json),
   openOneCommeFolder: () => ipcRenderer.invoke('open-onecomme-folder'),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
+  openReleases: () => ipcRenderer.invoke('open-releases'),
 });

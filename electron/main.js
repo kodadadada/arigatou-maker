@@ -64,6 +64,27 @@ ipcMain.handle('save-onecomme', async (_e, json) => {
   return { ok: true, dir };
 });
 
+// 更新のお知らせ：GitHub の最新リリースと今のバージョンを比べる（自動で入れ替えはしない。Mac は署名なしだと自動更新できないため）
+const REPO = 'kodadadada/arigatou-maker';
+const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+function isNewer(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0); }
+  return false;
+}
+ipcMain.handle('check-update', async () => {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const latest = String((await res.json()).tag_name || '').replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(latest)) return null;
+    return { current: app.getVersion(), latest, newer: isNewer(latest, app.getVersion()) };
+  } catch (e) { return null; } // オフラインなど
+});
+ipcMain.handle('open-releases', () => shell.openExternal(RELEASES_URL));
+
 ipcMain.handle('open-onecomme-folder', async () => {
   const dir = path.join(await templateRoot(), 'custom', TEMPLATE_NAME);
   try { await fs.access(dir); } catch (e) { return false; }
